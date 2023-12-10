@@ -1,13 +1,15 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { Animated, Button, Modal, StyleSheet, Text, TextInput, ToastAndroid, View } from 'react-native';
+import { Animated, Button, StyleSheet, Text, TextInput, ToastAndroid, View } from 'react-native';
 import WebView, { WebViewMessageEvent, WebViewNavigation } from 'react-native-webview';
 import SlidingUpPanel from 'rn-sliding-up-panel';
-
+import { useNavigation } from '@react-navigation/native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 const TWO_FACTOR_DISABLED = 'TWO_FACTOR_DISABLED';
 const TWO_FACTOR_ENABLED = 'TWO_FACTOR_ENABLED';
 
-const App = () => {
+const Login = () => {
+    const navigation = useNavigation();
     const webViewRef = useRef<WebView>(null);
     const [show2FAInstructions, setShow2FAInstructions] = useState(false);
     const [showAppPasswordInstructions, setShowAppPasswordInstructions] = useState(false);
@@ -24,24 +26,6 @@ const App = () => {
         );
     };
 
-    const webViewScript = `
-        var emailInput = document.querySelector('input[type=email]');
-        if (emailInput) {
-            emailInput.focus();
-            emailInput.value = 't.ghosh.me@gmail.com';
-
-            // Simulate a 'Next' button click
-            var nextButton = document.querySelector('[id="identifierNext"]');
-            if (nextButton) {
-                nextButton.click();
-            }
-        }
-    `;
-
-    const handleLoad = () => {
-        webViewRef.current?.injectJavaScript(webViewScript);
-    };
-
     const handleNavChange = (newNavState: WebViewNavigation) => {
         const isAppPasswordsPage = newNavState.url.startsWith('https://myaccount.google.com/apppasswords');
         const isGoogleAccountPage =
@@ -51,7 +35,7 @@ const App = () => {
         const is2FASettingsPage =
             newNavState.url.indexOf('two-step-verification') !== -1 && newNavState.url.indexOf('enroll-welcome') === -1;
 
-        if (isAppPasswordsPage) {
+        if (isAppPasswordsPage) { // landing here means 2FA is enabled
             setShowAppPasswordInstructions(true);
 
             webViewRef.current?.injectJavaScript(`
@@ -64,9 +48,10 @@ const App = () => {
                     }
                 };
             `);
-        } else if (isGoogleAccountPage) {
+        } else if (isGoogleAccountPage) { // landing here means user just logged in
             webViewRef.current?.injectJavaScript("window.location.href = 'https://myaccount.google.com/apppasswords';");
-        } else if (is2FASettingsPage) {
+        } else if (is2FASettingsPage) { // landing here means 2FA is enabled
+
             webViewRef.current?.injectJavaScript(`
                 window.location.href = 'https://myaccount.google.com/apppasswords';
             `);
@@ -86,36 +71,30 @@ const App = () => {
 
     const handleDoneClick = async () => {
         if (appPassword) {
-            // await AsyncStorage.setItem('APP_PASSWORD', appPassword);
-            console.log('-----------------------------App Password----------------------');
+            await AsyncStorage.setItem('APP_PASSWORD', appPassword);
             console.log(appPassword);
             setShowAppPasswordInstructions(false);
-            // TODO
-            // TODO
-            // TODO
-            // TODO
-            // TODO: Navigate to the next screen
-            // TODO
-            // TODO
-            // TODO
-            // TODO
-            // TODO
+            navigation.navigate('Dashboard');
         } else {
             ToastAndroid.show('Please enter your App Password', ToastAndroid.SHORT);
         }
     };
 
     useEffect(() => {
-        Animated.timing(dragValue, {
-            toValue: show2FAInstructions ? 400 : 50,
-            duration: 300,
-            useNativeDriver: true,
-        }).start();
-
         if (show2FAInstructions) {
+            Animated.timing(dragValue, {
+                toValue: show2FAInstructions ? 400 : 50,
+                duration: 300,
+                useNativeDriver: true,
+            }).start();
             twoFAInstructionPanel.current?.show();
         }
         if (showAppPasswordInstructions) {
+            Animated.timing(dragValue, {
+                toValue: showAppPasswordInstructions ? 500 : 50,
+                duration: 300,
+                useNativeDriver: true,
+            }).start();
             appPasswordsInstructionPanel.current?.show();
         }
     }, [show2FAInstructions, showAppPasswordInstructions]);
@@ -138,7 +117,6 @@ const App = () => {
                 javaScriptEnabled
                 domStorageEnabled
                 startInLoadingState
-                onLoad={handleLoad}
                 onMessage={handleMessage}
                 onNavigationStateChange={handleNavChange}
             />
@@ -170,8 +148,7 @@ const App = () => {
                     ref={appPasswordsInstructionPanel}
                     draggableRange={{ top: 500, bottom: 65 }}
                     showBackdrop
-                    animatedValue={dragValue}
-                >
+                    animatedValue={dragValue}>
                     <View style={styles.panel}>
                         <Text style={styles.panelTitle}>Generate App Password</Text>
                         <Text style={styles.panelSubtitle}>
@@ -188,6 +165,7 @@ const App = () => {
                             value={appPassword}
                             onChangeText={setAppPassword}
                             placeholder="Paste your App Password here"
+                            placeholderTextColor="#e0e0e0"
                         />
                         <Text style={styles.panelStep}>5. Once done, click on the "Done" button:</Text>
                         <View style={styles.buttonContainer}>
@@ -246,4 +224,4 @@ const styles = StyleSheet.create({
     },
 });
 
-export default App;
+export default Login;
