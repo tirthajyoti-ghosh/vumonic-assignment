@@ -1,8 +1,7 @@
 import * as React from 'react';
-import { Image, FlatList, Dimensions, Animated, Text, View, StyleSheet } from 'react-native';
-import { FlingGestureHandler, Directions, State } from 'react-native-gesture-handler';
-
+import { StatusBar, Image, FlatList, Dimensions, Animated, View, StyleSheet, SafeAreaView } from 'react-native';
 const { width } = Dimensions.get('screen');
+import { FlingGestureHandler, Directions, State } from 'react-native-gesture-handler';
 
 // https://www.creative-flyers.com
 const DATA = [
@@ -103,6 +102,8 @@ export default function App() {
                         setActiveIndex(index - 1);
                     }
                 }}>
+                <SafeAreaView style={styles.container}>
+                    <StatusBar hidden />
                     <FlatList
                         data={data}
                         keyExtractor={(_, index) => String(index)}
@@ -164,6 +165,7 @@ export default function App() {
                             );
                         }}
                     />
+                </SafeAreaView>
             </FlingGestureHandler>
         </FlingGestureHandler>
     );
