@@ -1,9 +1,8 @@
 import * as React from 'react';
-import { StatusBar, Image, FlatList, Dimensions, Animated, Text, View, StyleSheet, SafeAreaView } from 'react-native';
+import { Image, FlatList, Dimensions, Animated, Text, View, StyleSheet } from 'react-native';
 import { FlingGestureHandler, Directions, State } from 'react-native-gesture-handler';
 
 const { width } = Dimensions.get('screen');
-const WINDOW_WIDTH = Dimensions.get('window').width;
 
 // https://www.creative-flyers.com
 const DATA = [
@@ -68,10 +67,11 @@ export default function App() {
     }, []);
 
     React.useEffect(() => {
-        if (index === data.length - 1) {
-            setIndex(0);
+        if (index === data.length - VISIBLE_ITEMS - 1) {
+            const newData = [...data, ...data];
+            setData(newData);
         }
-    }, [index]);
+    });
 
     React.useEffect(() => {
         Animated.spring(scrollXAnimated, {
@@ -103,7 +103,6 @@ export default function App() {
                         setActiveIndex(index - 1);
                     }
                 }}>
-                    {/* <OverflowItems data={data} scrollXAnimated={scrollXAnimated} /> */}
                     <FlatList
                         data={data}
                         keyExtractor={(_, index) => String(index)}
@@ -129,17 +128,17 @@ export default function App() {
                             const inputRange = [index - 1, index, index + 1];
                             const translateX = scrollXAnimated.interpolate({
                                 inputRange,
-                                outputRange: [0, 0, -WINDOW_WIDTH], // modified outputRange
+                                outputRange: [50, 0, -100],
                             });
                             const scale = scrollXAnimated.interpolate({
                                 inputRange,
-                                outputRange: [1, 1, 0.9], // modified outputRange
+                                outputRange: [0.8, 1, 1.3],
                             });
                             const opacity = scrollXAnimated.interpolate({
                                 inputRange,
                                 outputRange: [1 - 1 / VISIBLE_ITEMS, 1, 0],
                             });
-                        
+
                             return (
                                 <Animated.View
                                     style={{
