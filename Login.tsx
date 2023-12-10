@@ -33,25 +33,20 @@ const Login = () => {
             newNavState.url.indexOf('apppasswords') === -1 &&
             newNavState.url.indexOf('two-step-verification') === -1;
         const is2FASettingsPage =
-            newNavState.url.indexOf('two-step-verification') !== -1 && newNavState.url.indexOf('enroll-welcome') === -1;
+            newNavState.url.indexOf('two-step-verification') !== -1 && newNavState.url.indexOf('enroll-welcome') === -1 && newNavState.url.indexOf('enroll-prompt') === -1;
 
-        if (isAppPasswordsPage) { // landing here means 2FA is enabled
-            setShowAppPasswordInstructions(true);
-
+        if (isAppPasswordsPage) { // landing here means checking if 2FA is enabled
             webViewRef.current?.injectJavaScript(`
-                document.onload = function() {
-                    var appNameInputs = document.querySelectorAll('input[type=text]');
-                    if (!appNameInputs || appNameInputs.length !== 2) {
-                        window.ReactNativeWebView.postMessage('${TWO_FACTOR_DISABLED}');
-                    } else if (appNameInputs && appNameInputs.length === 2) {
-                        window.ReactNativeWebView.postMessage('${TWO_FACTOR_ENABLED}');
-                    }
-                };
+                var appNameInputs = document.querySelectorAll('input[type=text]');
+                if (!appNameInputs || appNameInputs.length !== 2) {
+                    window.ReactNativeWebView.postMessage('${TWO_FACTOR_DISABLED}');
+                } else if (appNameInputs && appNameInputs.length === 2) {
+                    window.ReactNativeWebView.postMessage('${TWO_FACTOR_ENABLED}');
+                }
             `);
         } else if (isGoogleAccountPage) { // landing here means user just logged in
             webViewRef.current?.injectJavaScript("window.location.href = 'https://myaccount.google.com/apppasswords';");
         } else if (is2FASettingsPage) { // landing here means 2FA is enabled
-
             webViewRef.current?.injectJavaScript(`
                 window.location.href = 'https://myaccount.google.com/apppasswords';
             `);
@@ -64,7 +59,6 @@ const Login = () => {
         if (event.nativeEvent.data === TWO_FACTOR_DISABLED) {
             setShow2FAInstructions(true);
         } else if (event.nativeEvent.data === TWO_FACTOR_ENABLED) {
-            setShow2FAInstructions(false);
             setShowAppPasswordInstructions(true);
         }
     };
@@ -83,7 +77,7 @@ const Login = () => {
     useEffect(() => {
         if (show2FAInstructions) {
             Animated.timing(dragValue, {
-                toValue: show2FAInstructions ? 400 : 50,
+                toValue: show2FAInstructions ? 300 : 50,
                 duration: 300,
                 useNativeDriver: true,
             }).start();
@@ -123,7 +117,7 @@ const Login = () => {
             {show2FAInstructions && (
                 <SlidingUpPanel
                     ref={twoFAInstructionPanel}
-                    draggableRange={{ top: 400, bottom: 50 }}
+                    draggableRange={{ top: 300, bottom: 65 }}
                     showBackdrop
                     animatedValue={dragValue}>
                     <View style={styles.panel}>
@@ -131,13 +125,12 @@ const Login = () => {
                         <Text style={styles.panelSubtitle}>
                             To obtain App Passwords, enable Two-Factor Authentication (2FA). Follow the steps below:
                         </Text>
-                        <Text style={styles.panelStep}>1. Open your Gmail app and go to "Settings".</Text>
+                        <Text style={styles.panelStep}>1. Click the button below to navigate to 2FA settings.</Text>
                         <Text style={styles.panelStep}>
-                            2. Select your account and tap on "Manage your Google Account".
+                            2. Scroll down and click on "Get Started".
                         </Text>
                         <Text style={styles.panelStep}>
-                            3. Navigate to "Security" and find "Two-Factor Authentication". Follow the on-screen
-                            instructions to enable it.
+                            3. Follow the on-screen instructions to enable it.
                         </Text>
                         <Button onPress={navigateTo2FA} title="Go to 2FA settings" color="#2196F3" />
                     </View>
