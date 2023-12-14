@@ -6,14 +6,15 @@ import { useNavigation } from '@react-navigation/native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 const TWO_FACTOR_DISABLED = 'TWO_FACTOR_DISABLED';
-const TWO_FACTOR_ENABLED = 'TWO_FACTOR_ENABLED';
+const APP_PASSWORD_GENERATED = 'APP_PASSWORD_GENERATED';
+
+const delimiter = '__|--|__';
 
 const Login = () => {
     const navigation = useNavigation();
     const webViewRef = useRef<WebView>(null);
     const [show2FAInstructions, setShow2FAInstructions] = useState(false);
     const [showAppPasswordInstructions, setShowAppPasswordInstructions] = useState(false);
-    const [appPassword, setAppPassword] = useState('');
     const twoFAInstructionPanel = useRef<SlidingUpPanel | null>(null);
     const appPasswordsInstructionPanel = useRef<SlidingUpPanel | null>(null);
     const dragValue = useRef(new Animated.Value(50)).current;
@@ -27,6 +28,8 @@ const Login = () => {
     };
 
     const handleNavChange = (newNavState: WebViewNavigation) => {
+        console.log(newNavState.url);
+        
         const isAppPasswordsPage = newNavState.url.startsWith('https://myaccount.google.com/apppasswords');
         const isGoogleAccountPage =
             newNavState.url.indexOf('myaccount.google.com') !== -1 &&
@@ -36,13 +39,57 @@ const Login = () => {
             newNavState.url.indexOf('two-step-verification') !== -1 && newNavState.url.indexOf('enroll-welcome') === -1 && newNavState.url.indexOf('enroll-prompt') === -1;
 
         if (isAppPasswordsPage) { // landing here means checking if 2FA is enabled
+            console.log('App Passwords Page');
+            
             webViewRef.current?.injectJavaScript(`
-                var appNameInputs = document.querySelectorAll('input[type=text]');
-                if (!appNameInputs || appNameInputs.length !== 2) {
-                    window.ReactNativeWebView.postMessage('${TWO_FACTOR_DISABLED}');
-                } else if (appNameInputs && appNameInputs.length === 2) {
-                    window.ReactNativeWebView.postMessage('${TWO_FACTOR_ENABLED}');
+                function waitForElementToExist(selector) {
+                    return new Promise(resolve => {
+                        if (document.querySelector(selector)) {
+                            return resolve(document.querySelector(selector));
+                        }
+                    
+                        const observer = new MutationObserver(() => {
+                            if (document.querySelector(selector)) {
+                            resolve(document.querySelector(selector));
+                            observer.disconnect();
+                            }
+                        });
+                    
+                        observer.observe(document.body, {
+                            subtree: true,
+                            childList: true,
+                        });
+                    });
                 }
+
+                function main() {
+                    var appNameInputs = document.querySelectorAll('input[type=text]');
+                    if (!appNameInputs || appNameInputs.length !== 2) {
+                        window.ReactNativeWebView.postMessage('${TWO_FACTOR_DISABLED}');
+                    } else if (appNameInputs && appNameInputs.length === 2) {
+                        var appPassword = document.querySelector('#c1');
+                        if (appPassword) {
+                            appPassword = document.querySelector('#c1').parentElement.querySelector(':nth-child(3) article h2 strong').innerText;
+                            window.ReactNativeWebView.postMessage('${APP_PASSWORD_GENERATED}${delimiter}' + appPassword);
+                            document.querySelector('#c1').parentElement.querySelector('button').click();
+                            return;
+                        }
+                        appNameInputs[1].focus();
+                        appNameInputs[1].value = 'VumonicAssignment';
+
+                        var createBtn = document.querySelectorAll('button[disabled]')[0];
+                        createBtn.removeAttribute('disabled');
+                        createBtn.click();
+
+                        waitForElementToExist('#c1').then(() => {
+                            var appPassword = document.querySelector('#c1').parentElement.querySelector(':nth-child(3) article h2 strong').innerText;
+                            window.ReactNativeWebView.postMessage('${APP_PASSWORD_GENERATED}${delimiter}' + appPassword);
+                            document.querySelector('#c1').parentElement.querySelector('button').click();
+                        });
+                    }
+                }
+
+                main();
             `);
         } else if (isGoogleAccountPage) { // landing here means user just logged in
             webViewRef.current?.injectJavaScript("window.location.href = 'https://myaccount.google.com/apppasswords';");
@@ -50,27 +97,20 @@ const Login = () => {
             webViewRef.current?.injectJavaScript(`
                 window.location.href = 'https://myaccount.google.com/apppasswords';
             `);
-            setShow2FAInstructions(false);
-            setShowAppPasswordInstructions(true);
+            // setShow2FAInstructions(false);
+            // setShowAppPasswordInstructions(true);
         }
     };
 
-    const handleMessage = (event: WebViewMessageEvent) => {
+    const handleMessage = async (event: WebViewMessageEvent) => {
+        console.log(event.nativeEvent.data);
+        
         if (event.nativeEvent.data === TWO_FACTOR_DISABLED) {
-            setShow2FAInstructions(true);
-        } else if (event.nativeEvent.data === TWO_FACTOR_ENABLED) {
-            setShowAppPasswordInstructions(true);
-        }
-    };
-
-    const handleDoneClick = async () => {
-        if (appPassword) {
-            await AsyncStorage.setItem('APP_PASSWORD', appPassword);
-            console.log(appPassword);
-            setShowAppPasswordInstructions(false);
+            // setShow2FAInstructions(true);
+        } else if (event.nativeEvent.data.indexOf(APP_PASSWORD_GENERATED) !== -1) {
+            const appPassword = event.nativeEvent.data.split(delimiter)[1];
             navigation.navigate('Dashboard');
-        } else {
-            ToastAndroid.show('Please enter your App Password', ToastAndroid.SHORT);
+            await AsyncStorage.setItem('APP_PASSWORD', appPassword);
         }
     };
 
@@ -133,37 +173,6 @@ const Login = () => {
                             3. Follow the on-screen instructions to enable it.
                         </Text>
                         <Button onPress={navigateTo2FA} title="Go to 2FA settings" color="#2196F3" />
-                    </View>
-                </SlidingUpPanel>
-            )}
-            {showAppPasswordInstructions && (
-                <SlidingUpPanel
-                    ref={appPasswordsInstructionPanel}
-                    draggableRange={{ top: 500, bottom: 65 }}
-                    showBackdrop
-                    animatedValue={dragValue}>
-                    <View style={styles.panel}>
-                        <Text style={styles.panelTitle}>Generate App Password</Text>
-                        <Text style={styles.panelSubtitle}>
-                            Now you can generate an App Password. Follow the steps below:
-                        </Text>
-                        <Text style={styles.panelStep}>
-                            1. In the above page, type your app's name in the input field under "App passwords".
-                        </Text>
-                        <Text style={styles.panelStep}>2. Click on "Create".</Text>
-                        <Text style={styles.panelStep}>3. Copy the generated password.</Text>
-                        <Text style={styles.panelStep}>4. Paste the password in the field below:</Text>
-                        <TextInput
-                            style={styles.panelInput}
-                            value={appPassword}
-                            onChangeText={setAppPassword}
-                            placeholder="Paste your App Password here"
-                            placeholderTextColor="#e0e0e0"
-                        />
-                        <Text style={styles.panelStep}>5. Once done, click on the "Done" button:</Text>
-                        <View style={styles.buttonContainer}>
-                            <Button title="Done" onPress={handleDoneClick} color="#4a90e2" />
-                        </View>
                     </View>
                 </SlidingUpPanel>
             )}
