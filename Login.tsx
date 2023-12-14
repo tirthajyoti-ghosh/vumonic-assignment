@@ -14,9 +14,8 @@ const Login = () => {
     const navigation = useNavigation();
     const webViewRef = useRef<WebView>(null);
     const [show2FAInstructions, setShow2FAInstructions] = useState(false);
-    const [showAppPasswordInstructions, setShowAppPasswordInstructions] = useState(false);
+    const [appPasswordPageVisited, setAppPasswordPageVisited] = useState(false);
     const twoFAInstructionPanel = useRef<SlidingUpPanel | null>(null);
-    const appPasswordsInstructionPanel = useRef<SlidingUpPanel | null>(null);
     const dragValue = useRef(new Animated.Value(50)).current;
 
     const navigateTo2FA = () => {
@@ -27,9 +26,7 @@ const Login = () => {
         );
     };
 
-    const handleNavChange = (newNavState: WebViewNavigation) => {
-        console.log(newNavState.url);
-        
+    const handleNavChange = (newNavState: WebViewNavigation) => {        
         const isAppPasswordsPage = newNavState.url.startsWith('https://myaccount.google.com/apppasswords');
         const isGoogleAccountPage =
             newNavState.url.indexOf('myaccount.google.com') !== -1 &&
@@ -38,8 +35,8 @@ const Login = () => {
         const is2FASettingsPage =
             newNavState.url.indexOf('two-step-verification') !== -1 && newNavState.url.indexOf('enroll-welcome') === -1 && newNavState.url.indexOf('enroll-prompt') === -1;
 
-        if (isAppPasswordsPage) { // landing here means checking if 2FA is enabled
-            console.log('App Passwords Page');
+        if (isAppPasswordsPage && !appPasswordPageVisited) { // landing here means checking if 2FA is enabled
+            setAppPasswordPageVisited(true);
             
             webViewRef.current?.injectJavaScript(`
                 function waitForElementToExist(selector) {
@@ -97,16 +94,14 @@ const Login = () => {
             webViewRef.current?.injectJavaScript(`
                 window.location.href = 'https://myaccount.google.com/apppasswords';
             `);
-            // setShow2FAInstructions(false);
-            // setShowAppPasswordInstructions(true);
+            setShow2FAInstructions(false);
         }
     };
 
     const handleMessage = async (event: WebViewMessageEvent) => {
-        console.log(event.nativeEvent.data);
-        
         if (event.nativeEvent.data === TWO_FACTOR_DISABLED) {
-            // setShow2FAInstructions(true);
+            setAppPasswordPageVisited(false);
+            setShow2FAInstructions(true);
         } else if (event.nativeEvent.data.indexOf(APP_PASSWORD_GENERATED) !== -1) {
             const appPassword = event.nativeEvent.data.split(delimiter)[1];
             navigation.navigate('Dashboard');
@@ -123,15 +118,7 @@ const Login = () => {
             }).start();
             twoFAInstructionPanel.current?.show();
         }
-        if (showAppPasswordInstructions) {
-            Animated.timing(dragValue, {
-                toValue: showAppPasswordInstructions ? 500 : 50,
-                duration: 300,
-                useNativeDriver: true,
-            }).start();
-            appPasswordsInstructionPanel.current?.show();
-        }
-    }, [show2FAInstructions, showAppPasswordInstructions]);
+    }, [show2FAInstructions]);
 
     return (
         <View style={{ flex: 1 }}>
